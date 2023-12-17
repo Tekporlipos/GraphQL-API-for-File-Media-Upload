@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js" integrity="sha512-1QvjE7BtotQjkq8PxLeF6P46gEpBRXuskzIVgjFpekzFVF4yjRgrQvTG1MTOJ3yQgvTteKAcO7DSZI92+u/yZw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js" integrity="sha512-iKDtgDyTHjAitUDdLljGhenhPwrbBfqTKWO1mkhSFH3A7blITC9MhYon6SjnMhp4o0rADGw9yAC6EW4t5a4K3g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <title>File Upload</title>
+</head>
+
+<body>
+
+<h2>File Upload</h2>
+
+<form id="fileUploadForm" enctype="multipart/form-data">
+    <input type="file" name="files" id="fileInput" multiple onchange="handleFileSelection()">
+    <button type="button" onclick="uploadFiles()">Upload Files</button>
+</form>
+
+<table id="fileTable" border="1">
+    <thead>
+    <tr>
+        <th>Icon</th>
+        <th>Name</th>
+        <th>File Size</th>
+        <th>File Type</th>
+        <th>URL</th>
+    </tr>
+    </thead>
+    <tbody id="fileTableBody"></tbody>
+</table>
+<script>
+    function handleFileSelection() {
+        var filesInput = document.getElementById('fileInput');
+        var tableBody = document.getElementById('fileTableBody');
+
+        // Clear existing table content
+        tableBody.innerHTML = '';
+
+        // Display file details in the table
+        for (var i = 0; i < filesInput.files.length; i++) {
+            var file = filesInput.files[i];
+            var row = tableBody.insertRow(i);
+            var cell0 = row.insertCell(0);
+            var cell1 = row.insertCell(1);
+            var cell2 = row.insertCell(2);
+            var cell3 = row.insertCell(3);
+            var cell4 = row.insertCell(4);
+
+            cell1.innerHTML = file.name;
+            cell2.innerHTML = formatBytes(file.size);
+            cell3.innerHTML = file.type;
+        }
+    }
+
+    function uploadFiles() {
+        var input = document.getElementById('fileInput');
+        var files = input.files;
+        // Construct the GraphQL query string
+        var query = `
+    mutation MultipleUpload($files: [Upload]) {
+      multipleUpload(files: $files) {
+        status
+        message
+        data
+      }
+    }
+  `;
+
+        // Construct the GraphQL variables
+        var variables = {
+            files: files,
+        };
+
+        // Construct the full GraphQL request payload
+        var payload = {
+            query: query,
+            variables: variables,
+        };
+
+        // Send the GraphQL request
+        fetch('http://localhost:8080/graphql', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Include any other headers if needed
+            },
+            body: JSON.stringify(payload),
+        })
+            .then(response => response.json())
+            .then(data => {
+                // Handle the response data
+                connect(data.data.multipleUpload);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    var stompClient = null;
+
+    function connect(sessionId) {
+        var socket = new SockJS('http://localhost:8080/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+            stompClient.subscribe(`/topic/${sessionId}`, function (payload) {
+                console.log(JSON.parse(payload.body));
+            });
+        });
+    }
+</script>
+
+</body>
+
+</html>

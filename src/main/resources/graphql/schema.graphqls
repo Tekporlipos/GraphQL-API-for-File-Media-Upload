@@ -1,0 +1,24 @@
+type Query {
+    getAllFiles(page: Int, pageSize: Int): [UploadedFile]
+    getFile(id: ID!): UploadedFile!
+}
+scalar Upload
+type Mutation {
+    multipleUpload(files:[Upload]): CustomResponse
+}
+
+type CustomResponse {
+    status:String
+    message:String
+    data:String
+}
+
+type UploadedFile {
+    id: ID!
+    fileName: String!
+    message: String
+    url: String!
+    fileSize: Int!
+    contentType: String!
+    fileExtension: String!
+}
